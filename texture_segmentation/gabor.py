@@ -36,6 +36,7 @@ def gaussian_filter_bank_parameters(
     full_circle: bool = True,
     num_scales: int = 4,
     sigma_x0: float = 0.25,
+    sigma_y0_scale: float = 1,
     scaling_factor: float = 0.2,
 ) -> Tuple[NDArray, NDArray, NDArray]:
     """
@@ -49,7 +50,7 @@ def gaussian_filter_bank_parameters(
     else:
         angle_delta = np.pi / num_angles
 
-    sigma_y0 = np.abs(x0 * np.sin(angle_delta) / 2)
+    sigma_y0 = np.abs(sigma_y0_scale * x0 * np.sin(angle_delta) / 2)
 
     sigmas = [
         (sigma_x0 * (scaling_factor ** (k / 2)), sigma_y0 * (scaling_factor ** (k / 2)))
@@ -76,6 +77,7 @@ def gabor_filter_bank_fft(
     num_scales: int = 4,
     scaling_factor: float = 0.2,
     sigma_x0: float = 0.25,
+    sigma_y0_scale: float = 1,
 ) -> NDArray:
     """
     Generate a gaussian filter bank, which a set of gabor filters in the frequency domain.
@@ -86,6 +88,7 @@ def gabor_filter_bank_fft(
         num_scales=num_scales,
         scaling_factor=scaling_factor,
         sigma_x0=sigma_x0,
+        sigma_y0_scale=sigma_y0_scale,
     )
     filters = np.zeros((num_scales, num_angles, size, size), dtype=float)
 
@@ -103,6 +106,7 @@ def plot_gabor_filter_bank_fft_fwhm(
     num_scales: int = 4,
     scaling_factor: float = 2,
     sigma_x0: float = 0.25,
+    sigma_y0_scale: float = 1,
 ) -> NDArray:
     """
     Plot ellipses where the FWHM of the gabor filters are.
@@ -115,6 +119,7 @@ def plot_gabor_filter_bank_fft_fwhm(
         num_scales=num_scales,
         scaling_factor=scaling_factor,
         sigma_x0=sigma_x0,
+        sigma_y0_scale=sigma_y0_scale,
     )
 
     for _, (loc, sigma) in enumerate(zip(locs, sigmas)):
