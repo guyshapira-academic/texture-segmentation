@@ -1,7 +1,17 @@
-from typing import Tuple
+from typing import Any, Dict, Optional, Tuple
 import skimage as ski
 import numpy as np
 from numpy.typing import NDArray
+
+
+_default_gabor_params = {
+    'num_angles': 30,
+    'full_circle': True,
+    'scaling_factor': 0.3,
+    'num_scales': 4,
+    'sigma_x0': 0.2,
+    "sigma_y0": 0.07
+}
 
 
 def gaussian_filter(
@@ -36,7 +46,7 @@ def gaussian_filter_bank_parameters(
     full_circle: bool = True,
     num_scales: int = 4,
     sigma_x0: float = 0.25,
-    sigma_y0_scale: float = 1,
+    sigma_y0: float = 0.1,
     scaling_factor: float = 0.2,
 ) -> Tuple[NDArray, NDArray, NDArray]:
     """
@@ -50,7 +60,7 @@ def gaussian_filter_bank_parameters(
     else:
         angle_delta = np.pi / num_angles
 
-    sigma_y0 = np.abs(sigma_y0_scale * x0 * np.sin(angle_delta) / 2)
+    sigma_y0 = sigma_y0
 
     sigmas = [
         (sigma_x0 * (scaling_factor ** (k / 2)), sigma_y0 * (scaling_factor ** (k / 2)))
@@ -77,8 +87,8 @@ def gabor_filter_bank_fft(
     num_scales: int = 4,
     scaling_factor: float = 0.2,
     sigma_x0: float = 0.25,
-    sigma_y0_scale: float = 1,
-) -> NDArray:
+    sigma_y0: float = 0.1,
+) -> Tuple[NDArray, NDArray]:
     """
     Generate a gaussian filter bank, which a set of gabor filters in the frequency domain.
     """
@@ -88,7 +98,7 @@ def gabor_filter_bank_fft(
         num_scales=num_scales,
         scaling_factor=scaling_factor,
         sigma_x0=sigma_x0,
-        sigma_y0_scale=sigma_y0_scale,
+        sigma_y0=sigma_y0,
     )
     filters = np.zeros((num_scales, num_angles, size, size), dtype=float)
 
@@ -96,7 +106,7 @@ def gabor_filter_bank_fft(
         for angle, theta in enumerate(thetas):
             filters[scale, angle, :, :] = gaussian_filter(size, loc, sigma, theta)
 
-    return filters
+    return filters, (locs, sigmas, thetas)
 
 
 def plot_gabor_filter_bank_fft_fwhm(
@@ -106,7 +116,7 @@ def plot_gabor_filter_bank_fft_fwhm(
     num_scales: int = 4,
     scaling_factor: float = 2,
     sigma_x0: float = 0.25,
-    sigma_y0_scale: float = 1,
+    sigma_y0: float = 0.1,
 ) -> NDArray:
     """
     Plot ellipses where the FWHM of the gabor filters are.
@@ -119,7 +129,7 @@ def plot_gabor_filter_bank_fft_fwhm(
         num_scales=num_scales,
         scaling_factor=scaling_factor,
         sigma_x0=sigma_x0,
-        sigma_y0_scale=sigma_y0_scale,
+        sigma_y0=sigma_y0,
     )
 
     for _, (loc, sigma) in enumerate(zip(locs, sigmas)):
@@ -140,3 +150,36 @@ def plot_gabor_filter_bank_fft_fwhm(
             image[rr, cc] = 1
 
     return image
+
+
+def gabor_features_raw(image: NDArray, gabor_filters_params: Optional[Dict[str, Any]] = None) -> NDArray:
+    global _default_gabor_params
+
+    assert image.ndim == 2 or image.ndim == 3
+    init_dim = image.ndim
+    if image.ndim == 2:
+        image = image[np.newaxis, :, :]
+    
+    assert image.shape[-2] == image.shape[-1]
+    size = image.shape[-1]
+    
+    if gabor_filters_params is None:
+        gabor_filters_params = _default_gabor_params
+    
+    gabor_filters_fft, _ = gabor_filter_bank_fft(size=size, **gabor_filters_params)
+    
+    c, h, w = image.shape
+    num_scales, num_angles, _, _ = gabor_filters_fft.shape
+    image = image.reshape(c, 1, 1, h, w)
+    gabor_filters_fft = gabor_filters_fft.reshape(1, num_scales, num_angles, h, w)
+    gabor_filters_fft = np.fft.ifftshift(gabor_filters_fft, axes=(-2, -1))
+    image_fft = np.fft.fft2(image, axes=(-2, -1), norm="ortho")
+    print(image_fft.shape, gabor_filters_fft.shape)
+    gabor_features_fft = gabor_filters_fft * image_fft.conj()
+    print(gabor_features_fft.shape)
+    gabor_features = np.fft.ifft2(gabor_features_fft, axes=(-2, -1), norm="ortho")
+
+    if init_dim == 2:
+        gabor_features = gabor_features[0]
+
+    return gabor_features
