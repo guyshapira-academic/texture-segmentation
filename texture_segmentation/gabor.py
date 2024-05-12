@@ -5,12 +5,12 @@ from numpy.typing import NDArray
 
 
 _default_gabor_params = {
-    'num_angles': 30,
-    'full_circle': True,
-    'scaling_factor': 0.3,
-    'num_scales': 4,
-    'sigma_x0': 0.2,
-    "sigma_y0": 0.07
+    "num_angles": 15,
+    "full_circle": False,
+    "scaling_factor": 0.3,
+    "num_scales": 4,
+    "sigma_x0": 0.2,
+    "sigma_y0": 0.07,
 }
 
 
@@ -152,22 +152,24 @@ def plot_gabor_filter_bank_fft_fwhm(
     return image
 
 
-def gabor_features_raw(image: NDArray, gabor_filters_params: Optional[Dict[str, Any]] = None) -> NDArray:
+def gabor_features_raw(
+    image: NDArray, gabor_filters_params: Optional[Dict[str, Any]] = None
+) -> NDArray:
     global _default_gabor_params
 
     assert image.ndim == 2 or image.ndim == 3
     init_dim = image.ndim
     if image.ndim == 2:
         image = image[np.newaxis, :, :]
-    
+
     assert image.shape[-2] == image.shape[-1]
     size = image.shape[-1]
-    
+
     if gabor_filters_params is None:
         gabor_filters_params = _default_gabor_params
-    
+
     gabor_filters_fft, _ = gabor_filter_bank_fft(size=size, **gabor_filters_params)
-    
+
     c, h, w = image.shape
     num_scales, num_angles, _, _ = gabor_filters_fft.shape
     image = image.reshape(c, 1, 1, h, w)
