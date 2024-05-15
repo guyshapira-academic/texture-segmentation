@@ -210,5 +210,5 @@ def gabor_features(
     max_angle = max_angle_idx * np.pi / raw_features['num_angles']
     max_scale = locs[max_freq_idx][0]
 
-    features_dict = {"angle": max_angle, "scale": max_scale, "max_real": max_real_gabor_response, "max_imag": max_imag_gabor_response}
+    features_dict = {"angle": max_angle, "freq": max_scale, "max_real": max_real_gabor_response, "max_imag": max_imag_gabor_response}
     return gabor_response, features_dict
