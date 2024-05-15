@@ -185,3 +185,30 @@ def gabor_features_raw(
         gabor_features = gabor_features[0]
 
     return gabor_features
+
+
+def gabor_features(
+    image: NDArray, gabor_filters_params: Optional[Dict[str, Any]] = None
+) -> NDArray:
+    global _default_gabor_params
+    if gabor_filters_params is None:
+        gabor_filters_params = _default_gabor_params
+    locs = gabor_filters_params[0]
+    raw_features = gabor_features_raw(image, gabor_filters_params)
+    gabor_response = np.abs(raw_features)
+
+    n, m = gabor_response.shape[:2]
+    gabor_response = gabor_response.reshape(n * m, *gabor_response.shape[2:])
+    max_idx = np.argmax(gabor_response, axis=0)
+    # gabor_resoponse = gabor_resoponse.reshape(n, m, *gabor_resoponse.shape[1:])
+    max_freq_idx, max_angle_idx = np.unravel_index(max_idx, (n, m))
+    xx, yy = np.mgrid[0:gabor_response.shape[-2], 0:gabor_response.shape[-1]]
+    print(xx.shape, yy.shape)
+    max_complex_gabor_response = raw_features[max_freq_idx, max_angle_idx, xx, yy]
+    max_real_gabor_response = max_complex_gabor_response.real
+    max_imag_gabor_response = max_complex_gabor_response.imag
+    max_angle = max_angle_idx * np.pi / raw_features['num_angles']
+    max_scale = locs[max_freq_idx][0]
+
+    features_dict = {"angle": max_angle, "scale": max_scale, "max_real": max_real_gabor_response, "max_imag": max_imag_gabor_response}
+    return gabor_response, features_dict
