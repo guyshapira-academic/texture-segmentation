@@ -4,12 +4,12 @@ import numpy as np
 from numpy.typing import NDArray
 
 
-_default_gabor_params = {
-    "num_angles": 15,
+_default_filter_bank_params = {
+    "num_angles": 20,
     "full_circle": False,
-    "scaling_factor": 0.3,
+    "scaling_factor": 0.4,
     "num_scales": 4,
-    "sigma_x0": 0.2,
+    "sigma_x0": 0.17,
     "sigma_y0": 0.07,
 }
 
@@ -36,7 +36,7 @@ def gaussian_filter(
     arr = np.exp(exponent_)
 
     # Normalize
-    arr = arr / arr.sum()
+    arr = arr / np.linalg.norm(arr)
 
     return arr
 

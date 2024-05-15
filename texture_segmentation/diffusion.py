@@ -27,7 +27,10 @@ def diffuse_features(features, it=20, eta=1e-1):
         fx = grad_x / (1 + grad_magnitude**2)
         fy = grad_y / (1 + grad_magnitude**2)
 
-        f = np.gradient(fx, axis=(-2, -1), edge_order=2)[1] + np.gradient(fy, axis=(-2, -1), edge_order=2)[0]
+        f = (
+            np.gradient(fx, axis=(-2, -1), edge_order=2)[1]
+            + np.gradient(fy, axis=(-2, -1), edge_order=2)[0]
+        )
 
         # f = sp.ndimage.gaussian_filter(
         #     fx, (0, 1, 1), order=(0, 0, 1)
