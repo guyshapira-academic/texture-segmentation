@@ -204,23 +204,43 @@ def gabor_features(
     max_idx = np.argmax(gabor_response, axis=0)
     # gabor_resoponse = gabor_resoponse.reshape(n, m, *gabor_resoponse.shape[1:])
     max_freq_idx, max_angle_idx = np.unravel_index(max_idx, (n, m))
-    xx, yy = np.mgrid[0:gabor_response.shape[-2], 0:gabor_response.shape[-1]]
+    xx, yy = np.mgrid[0 : gabor_response.shape[-2], 0 : gabor_response.shape[-1]]
     max_complex_gabor_response = raw_features[max_freq_idx, max_angle_idx, xx, yy]
     max_real_gabor_response = max_complex_gabor_response.real
     max_imag_gabor_response = max_complex_gabor_response.imag
-    max_angle = max_angle_idx * np.pi / gabor_filters_params['num_angles']
+    max_angle = max_angle_idx * np.pi / gabor_filters_params["num_angles"]
     max_angle_sin = np.sin(max_angle)
     max_angle_cos = np.cos(max_angle)
     init_shape = max_freq_idx.shape
     max_freq = locs[max_freq_idx.flatten()].reshape(init_shape)
-       
 
-    hl_features = np.stack([max_angle_cos, max_angle_sin, max_freq, max_real_gabor_response, max_imag_gabor_response], axis=0)
-    return gabor_response, hl_features, ("angle_cos", "angle_sin", "freq", "max_real", "max_imag")
+    hl_features = np.stack(
+        [
+            max_angle_cos,
+            max_angle_sin,
+            max_freq,
+            max_real_gabor_response,
+            max_imag_gabor_response,
+        ],
+        axis=0,
+    )
+    return (
+        gabor_response,
+        hl_features,
+        ("angle_cos", "angle_sin", "freq", "max_real", "max_imag"),
+    )
 
-def features_post_process(features: NDArray, sigma: float = 5, diffusion_eta: float = 0.1, diffusion_steps: int = 50) -> NDArray:
+
+def features_post_process(
+    features: NDArray,
+    sigma: float = 5,
+    diffusion_eta: float = 0.1,
+    diffusion_steps: int = 50,
+) -> NDArray:
     features = features.copy()
     features = sp.ndimage.gaussian_filter(features, sigma=(0, sigma, sigma))
-    features = diffusion.diffuse_features(features, it=diffusion_steps, eta=diffusion_eta)
-    
+    features = diffusion.diffuse_features(
+        features, it=diffusion_steps, eta=diffusion_eta
+    )
+
     return features
