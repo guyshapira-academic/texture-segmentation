@@ -1,6 +1,4 @@
-from typing import Tuple
 import numpy as np
-import scipy as sp
 from numpy.typing import NDArray
 
 from tqdm import trange
@@ -22,7 +20,7 @@ def diffuse_features(features, it=20, eta=1e-1):
         features = np.expand_dims(features, axis=0)
     for _ in trange(it):
         grad_x, grad_y = np.gradient(features, axis=(-2, -1), edge_order=2)
-        grad_magnitude = np.sqrt(grad_x**2 + grad_y**2)
+        grad_magnitude = np.sqrt(np.abs(grad_x**2 + grad_y**2))
 
         fx = grad_x / (1 + grad_magnitude**2)
         fy = grad_y / (1 + grad_magnitude**2)
