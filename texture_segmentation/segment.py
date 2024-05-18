@@ -139,13 +139,19 @@ def vector_chan_vase(
         features = np.expand_dims(features, axis=0)
     phi = initial_function.copy()
 
+    if combined_mathod:
+        g = isotropic_metric(features)
+        h = np.sqrt(g)
+    else:
+        h = np.ones(shape=features.shape[-2:])
+
     iterator = trange(it)
     for _ in iterator:
         grad_y, grad_x = np.gradient(phi, axis=(-2, -1), edge_order=2)
         grad_magnitude = np.sqrt(grad_x**2 + grad_y**2)
         
-        fx = grad_x / (grad_magnitude + 1e-10)
-        fy = grad_y / (grad_magnitude + 1e-10)
+        fx = h * grad_x / (grad_magnitude + 1e-10)
+        fy = h * grad_y / (grad_magnitude + 1e-10)
         f_div = np.gradient(fx, axis=(-2, -1), edge_order=2)[1] + np.gradient(fy, axis=(-2, -1), edge_order=2)[0]
 
         c_in = features[:, phi >= 0].mean(axis=1)
@@ -159,5 +165,6 @@ def vector_chan_vase(
         phi += dphidt
     
     return {
-        "phi": phi
+        "phi": phi,
+        "h": h,
     }
