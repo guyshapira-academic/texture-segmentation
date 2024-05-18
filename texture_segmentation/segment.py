@@ -27,14 +27,18 @@ def isotropic_metric(features: NDArray) -> NDArray:
     """
     g = pullback_metric(features)
     g = 1 / (np.linalg.det(g) ** 2 + 1e-7)
-    return g 
+    return g
 
 
 def deodesic_active_contours_segment(
-    features: NDArray, initial_function: NDArray, it: int = 100, eta: float = 1e-1, c: float = 1
+    features: NDArray,
+    initial_function: NDArray,
+    it: int = 100,
+    eta: float = 1e-1,
+    c: float = 1,
 ) -> NDArray:
     """
-    Perform texture segmentation using the geodesic active contours model, 
+    Perform texture segmentation using the geodesic active contours model,
     using the level set method.
     """
     features = features.copy()
@@ -61,17 +65,20 @@ def deodesic_active_contours_segment(
     fx_logs = []
     fy_logs = []
     grad_magnitude_logs = []
-    
+
     iterator = trange(it)
 
     for _ in iterator:
         phi = sp.ndimage.gaussian_filter(phi, (3, 3), order=(0, 0))
         grad_x, grad_y = np.gradient(phi, axis=(-2, -1), edge_order=2)
-        grad_magnitude = np.sqrt(grad_x ** 2 + grad_y ** 2)
+        grad_magnitude = np.sqrt(grad_x**2 + grad_y**2)
 
         f_x = E * grad_x / (grad_magnitude + 1e-5)
         f_y = E * grad_y / (grad_magnitude + 1e-5)
-        div_f = np.gradient(f_x, axis=(-2, -1), edge_order=2)[1] + np.gradient(f_y, axis=(-2, -1), edge_order=2)[0]
+        div_f = (
+            np.gradient(f_x, axis=(-2, -1), edge_order=2)[1]
+            + np.gradient(f_y, axis=(-2, -1), edge_order=2)[0]
+        )
         dUdt = grad_magnitude * div_f
         dUdt += c * E * grad_magnitude
 
@@ -92,4 +99,12 @@ def deodesic_active_contours_segment(
     fy_logs = np.array(fy_logs)
     grad_magnitude_logs = np.array(grad_magnitude_logs)
 
-    return {"phi": phi, "E": E, "phi_logs": phi_logs, "step_logs": step_logs, "fx_logs": fx_logs, "fy_logs": fy_logs, "grad_magnitude_logs": grad_magnitude_logs}
+    return {
+        "phi": phi,
+        "E": E,
+        "phi_logs": phi_logs,
+        "step_logs": step_logs,
+        "fx_logs": fx_logs,
+        "fy_logs": fy_logs,
+        "grad_magnitude_logs": grad_magnitude_logs,
+    }
