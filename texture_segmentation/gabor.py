@@ -238,7 +238,7 @@ def features_post_process(
     diffusion_steps: int = 50,
 ) -> NDArray:
     features = features.copy()
-    features = sp.ndimage.gaussian_filter(features, sigma=(0, sigma, sigma))
+    features = sp.ndimage.gaussian_filter(features, sigma=(0, sigma, sigma), mode="reflect")
     features = diffusion.diffuse_features(
         features, it=diffusion_steps, eta=diffusion_eta
     )
