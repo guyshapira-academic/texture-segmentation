@@ -6,15 +6,14 @@ from numpy.typing import NDArray
 
 from texture_segmentation import diffusion
 
-_default_filter_bank_params = {
-    "num_angles": 20,
-    "full_circle": False,
-    "scaling_factor": 0.4,
-    "num_scales": 4,
-    "sigma_x0": 0.17,
-    "sigma_y0": 0.07,
+filter_bank_params = {
+    'num_angles': 20,
+    'full_circle': False,
+    'scaling_factor': 0.45,
+    'num_scales': 4,
+    'sigma_x0': 0.15,
+    "sigma_y0": 0.06
 }
-
 
 def gaussian_filter(
     size: int, loc: Tuple[float, float], sigma: Tuple[float, float], theta: float
@@ -69,7 +68,7 @@ def gaussian_filter_bank_parameters(
         for k in range(0, num_scales)
     ]
 
-    locs = [(x0, 0)]
+    locs = [(x0 * 0.8, 0)]
     for k in range(1, num_scales):
         next_ = (
             locs[-1][0]
@@ -107,6 +106,8 @@ def gabor_filter_bank_fft(
     for scale, (loc, sigma) in enumerate(zip(locs, sigmas)):
         for angle, theta in enumerate(thetas):
             filters[scale, angle, :, :] = gaussian_filter(size, loc, sigma, theta)
+
+    filters /= np.linalg.norm(filters)
 
     return filters, (locs, sigmas, thetas)
 
@@ -238,7 +239,7 @@ def features_post_process(
     diffusion_steps: int = 50,
 ) -> NDArray:
     features = features.copy()
-    features = sp.ndimage.gaussian_filter(features, sigma=(0, sigma, sigma))
+    features = sp.ndimage.gaussian_filter(features, sigma=(0, sigma, sigma), mode="reflect")
     features = diffusion.diffuse_features(
         features, it=diffusion_steps, eta=diffusion_eta
     )
