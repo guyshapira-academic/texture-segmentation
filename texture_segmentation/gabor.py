@@ -170,16 +170,32 @@ def gabor_features_raw(
     if gabor_filters_params is None:
         gabor_filters_params = _default_gabor_params
 
-    gabor_filters_fft, _ = gabor_filter_bank_fft(size=size, **gabor_filters_params)
-
     c, h, w = image.shape
+
+    gabor_filters_fft, _ = gabor_filter_bank_fft(size=size, **gabor_filters_params)
     num_scales, num_angles, _, _ = gabor_filters_fft.shape
-    image = image.reshape(c, 1, 1, h, w)
-    gabor_filters_fft = gabor_filters_fft.reshape(1, num_scales, num_angles, h, w)
+
     gabor_filters_fft = np.fft.ifftshift(gabor_filters_fft, axes=(-2, -1))
-    image_fft = np.fft.fft2(image, axes=(-2, -1), norm="ortho")
-    gabor_features_fft = gabor_filters_fft * image_fft
-    gabor_features = np.fft.ifft2(gabor_features_fft, axes=(-2, -1), norm="ortho")
+    gabor_filters = np.fft.ifft2(gabor_filters_fft, norm="ortho")
+    gabor_filters = np.fft.fftshift(gabor_filters, axes=(-2, -1))
+    gabor_filters /= np.linalg.norm(gabor_filters, axis=(-2, -1), keepdims=True)
+    gabor_filters = gabor_filters.reshape(1, num_scales, num_angles, h, w)
+    image = image.reshape(c, 1, 1, h, w)
+    gabor_features = sp.signal.fftconvolve(image, gabor_filters, mode="full")
+    gabor_features_crop = gabor_features[:, :, :, size//2:-size//2 + 1, size//2:-size//2 + 1]
+    gabor_features = gabor_features_crop[:, :, :, :h, :w]
+
+    # c, h, w = image.shape
+    # num_scales, num_angles, _, _ = gabor_filters_fft.shape
+    # image = image.reshape(c, 1, 1, h, w)
+    # pad_width = size
+    # image = np.pad(image, ((0, 0), (0, 0), (0, 0), (0, pad_width), (0, pad_width)), mode="reflect", reflect_type="even")
+    # gabor_filters_fft = gabor_filters_fft.reshape(1, num_scales, num_angles, h * 2, w * 2)
+    # gabor_filters_fft = np.fft.ifftshift(gabor_filters_fft, axes=(-2, -1))
+    # image_fft = np.fft.fft2(image, axes=(-2, -1), norm="ortho")
+    # gabor_features_fft = gabor_filters_fft * image_fft
+    # gabor_features = np.fft.ifft2(gabor_features_fft, axes=(-2, -1), norm="ortho")
+    # gabor_features = gabor_features[:, :, :, :-pad_width, :-pad_width]
 
     if init_dim == 2:
         gabor_features = gabor_features[0]
@@ -238,7 +254,7 @@ def features_post_process(
     diffusion_steps: int = 50,
 ) -> NDArray:
     features = features.copy()
-    features = sp.ndimage.gaussian_filter(features, sigma=(0, sigma, sigma))
+    features = sp.ndimage.gaussian_filter(features, sigma=(0, sigma, sigma), mode="reflect")
     features = diffusion.diffuse_features(
         features, it=diffusion_steps, eta=diffusion_eta
     )
