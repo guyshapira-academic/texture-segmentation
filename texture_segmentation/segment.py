@@ -25,7 +25,7 @@ def pullback_metric(features: NDArray) -> NDArray:
     grad = np.moveaxis(grad, 0, -1)
     grad = np.moveaxis(grad, 0, -2)
     grad_t = np.moveaxis(grad, -2, -1)
-    g = grad_t @ grad + np.expand_dims(np.eye(2), axis=(0, 1))
+    g = (grad_t @ grad * 1 ) + np.expand_dims(np.eye(2), axis=(0, 1))
     return g
 
 
@@ -34,7 +34,7 @@ def isotropic_metric(features: NDArray) -> NDArray:
     Compute the isotropic metric.
     """
     g = pullback_metric(features)
-    g = 1 / ( np.linalg.det(g) ** 2 + 1e-7)
+    g = 1 / ( np.linalg.det(g) + 1e-7)
     return g
 
 
@@ -53,20 +53,12 @@ def deodesic_active_contours_segment(
 
     # Standardize the features
     features = (features - features.mean()) / features.std()
-
-    # grad_x, grad_y = np.gradient(features, axis=(-2, -1), edge_order=2)
-    # grad_magnitude = np.sqrt(grad_x ** 2 + grad_y ** 2)
-    # grad_magnitude = np.mean(grad_magnitude, axis=(-2, -1), keepdims=True)
-    # features /= (grad_magnitude + 1e-7)
-
     if features.ndim == 2:
         features = np.expand_dims(features, axis=0)
     phi = initial_function.copy()
 
     g = isotropic_metric(features)
-    E = np.sqrt(g)
-    # E = np.expand_dims(E, axis=0)
-    print(E.shape)
+    E = g
 
     phi_logs = []
     step_logs = []
@@ -141,7 +133,7 @@ def vector_chan_vase(
 
     if combined_mathod:
         g = isotropic_metric(features)
-        h = np.sqrt(g)
+        h = g
     else:
         h = np.ones(shape=features.shape[-2:])
 
@@ -161,7 +153,9 @@ def vector_chan_vase(
         error_out = (features - c_out[:, None, None]) ** 2
         error_term = - ( (1 - lambda_c) * error_in - lambda_c * error_out).mean(axis=0)
 
-        dphidt = eta * (mu * f_div - (1 - mu) * error_term)
+        dphidt = eta * (mu * f_div + (1 - mu) * error_term)
+        if combined_mathod:
+            dphidt += approximate_delta_function(dphidt, eps=3) * dphidt
         phi += dphidt
     
     return {
