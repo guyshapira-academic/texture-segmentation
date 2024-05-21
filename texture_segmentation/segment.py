@@ -5,7 +5,7 @@ import scipy as sp
 from tqdm import trange
 
 
-def approximate_delta_function(x: NDArray, eps: float = 10) -> NDArray:
+def approximate_delta_function(x: NDArray, eps: float = 1.0) -> NDArray:
     """
     Approximate the delta function.
     """
@@ -161,7 +161,7 @@ def vector_chan_vase(
         error_out = (features - c_out[:, None, None]) ** 2
         error_term = - ( (1 - lambda_c) * error_in - lambda_c * error_out).mean(axis=0)
 
-        dphidt = eta * approximate_delta_function(phi) * (mu * f_div + (1 - mu) * error_term)
+        dphidt = eta * (mu * f_div - (1 - mu) * error_term)
         phi += dphidt
     
     return {
