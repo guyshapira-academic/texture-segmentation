@@ -1,9 +1,12 @@
-from typing import Dict
+from typing import Dict, Literal, Union
+import enum
 import numpy as np
 from numpy.typing import NDArray
 import scipy as sp
 from tqdm import trange
 
+from texture_segmentation import gabor
+import skimage as ski
 
 def approximate_delta_function(x: NDArray, eps: float = 1.0) -> NDArray:
     """
@@ -58,7 +61,7 @@ def deodesic_active_contours_segment(
     phi = initial_function.copy()
 
     g = isotropic_metric(features)
-    E = g
+    E = g ** 2
 
     phi_logs = []
     step_logs = []
@@ -69,7 +72,6 @@ def deodesic_active_contours_segment(
     iterator = trange(it)
 
     for _ in iterator:
-        # phi = sp.ndimage.gaussian_filter(phi, (3, 3), order=(0, 0))
         grad_y, grad_x = np.gradient(phi, axis=(-2, -1), edge_order=2)
         grad_magnitude = np.sqrt(grad_x**2 + grad_y**2)
 
@@ -117,7 +119,7 @@ def vector_chan_vase(
     eta: float = 1e-1,
     lambda_c: float = 0.5,
     mu: float = 0.1,
-    combined_mathod: bool = False,
+    combined_mathod: bool = True,
 ) -> Dict[str, NDArray]:
     """
     Perform texture segmentation using the vector-generalized Chan-Vese model.
@@ -162,3 +164,71 @@ def vector_chan_vase(
         "phi": phi,
         "h": h,
     }
+
+
+class SEG_METHOD(enum.Enum):
+    GEODESIC_SNAKES = enum.auto()
+
+class FEATURE_TYPE(enum.Enum):
+    GABOR = enum.auto()
+    HIGH_LEVEL = enum.auto()
+    IMAGE = enum.auto()
+
+
+def segment(
+    image: NDArray,
+    method: SEG_METHOD,
+    feature_type: FEATURE_TYPE = FEATURE_TYPE.GABOR,
+    initial_function: Union[str, NDArray] = "random",
+    it: int = 100,
+    eta: float = 1e-1,
+    gabor_filters_params: Dict[str, float] = None,
+    **kwargs,
+) -> Dict[str, NDArray]:
+    """
+    Perform texture segmentation.
+    """
+    # Compute the features
+    gabor_features, hl_features, names = gabor.gabor_features(image, gabor_filters_params)
+    hl_features -= hl_features.mean(axis=(-2, -1), keepdims=True)
+    hl_features /= (hl_features.std(axis=(-2, -1), keepdims=True) + 1e-6)
+    gabor_features = gabor.features_post_process(gabor_features, sigma=2, diffusion_eta=0.1, diffusion_steps=20)
+    hl_features = gabor.features_post_process(hl_features, sigma=2, diffusion_eta=0.1, diffusion_steps=10)
+
+    if feature_type == FEATURE_TYPE.GABOR:
+        features = gabor_features
+    elif feature_type == FEATURE_TYPE.HIGH_LEVEL:
+        features = hl_features
+    elif feature_type == FEATURE_TYPE.IMAGE:
+        features = image
+
+    imsize = image.shape[-1]
+    if isinstance(initial_function, str):
+        if initial_function == "disk":
+            phi0 = 2 * ski.segmentation.disk_level_set(image_shape=(imsize, imsize)).astype(float) - 1
+            phi0 = sp.ndimage.gaussian_filter(phi0, sigma=5)
+        elif initial_function == "checkers":
+            phi0 = 2 * ski.segmentation.checkerboard_level_set((imsize, imsize), 10).astype(float) - 1
+            phi0 = sp.ndimage.gaussian_filter(phi0, sigma=5)
+        elif initial_function == "random":
+            phi0 = np.random.randn(imsize, imsize) * 0.1
+            phi0 = sp.ndimage.gaussian_filter(phi0, sigma=5)
+        else:
+            raise ValueError("Invalid initial function")      
+    else:
+        phi0 = initial_function 
+
+    if method == SEG_METHOD.GEODESIC_SNAKES:
+        res = vector_chan_vase(
+            features, phi0, it=it, eta=eta, **kwargs
+        )
+    else:
+        raise ValueError("Invalid segmentation method")
+    
+    res["features"] = features
+    res["image"] = image
+    res["phi0"] = phi0
+    res["hl_features"] = hl_features
+    res["gabor_features"] = gabor_features
+
+    return res

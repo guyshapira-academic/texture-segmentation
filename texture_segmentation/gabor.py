@@ -68,7 +68,7 @@ def gaussian_filter_bank_parameters(
         for k in range(0, num_scales)
     ]
 
-    locs = [(x0 * 0.8, 0)]
+    locs = [(x0 * 0.9, 0)]
     for k in range(1, num_scales):
         next_ = (
             locs[-1][0]
@@ -198,7 +198,8 @@ def gabor_features(
     locs = bank_params[0]
     locs = np.array(locs)[:, 0]
     raw_features = gabor_features_raw(image, gabor_filters_params)
-    gabor_response = np.abs(raw_features)
+    gabor_response_o = np.abs(raw_features)
+    gabor_response = sp.ndimage.gaussian_filter(gabor_response_o, sigma=(0, 0, 5, 5))
 
     n, m = gabor_response.shape[:2]
     gabor_response = gabor_response.reshape(n * m, *gabor_response.shape[2:])
