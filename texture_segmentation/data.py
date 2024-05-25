@@ -33,9 +33,9 @@ def brodatz_test_image(bg_id: int=77, texture_id: int=17, imsize: int = 300):
 
 def sine_wave_test_image(imsize: int = 300):
     yy, xx = np.mgrid[:imsize, :imsize]
-    bg = np.sin(xx / 3)
-
-    inner = np.sin((xx * np.cos(np.pi / 8) + yy * np.sin(np.pi / 8)) / 2)
+    bg = np.sin(xx / 2)
+    phi = np.pi / 2
+    inner = np.sin((xx * np.cos(phi) + yy * np.sin(phi)) / 2)
 
     image = bg
     image[imsize//3:-imsize//3, imsize//3:-imsize//3] = inner[imsize//3:-imsize//3, imsize//3:-imsize//3]

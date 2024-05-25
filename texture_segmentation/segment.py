@@ -28,7 +28,7 @@ def pullback_metric(features: NDArray) -> NDArray:
     grad = np.moveaxis(grad, 0, -1)
     grad = np.moveaxis(grad, 0, -2)
     grad_t = np.moveaxis(grad, -2, -1)
-    g = (grad_t @ grad * 1 ) + np.expand_dims(np.eye(2), axis=(0, 1))
+    g = (grad_t @ grad) + np.expand_dims(np.eye(2), axis=(0, 1))
     return g
 
 
@@ -61,7 +61,7 @@ def deodesic_active_contours_segment(
     phi = initial_function.copy()
 
     g = isotropic_metric(features)
-    E = g ** 2
+    E = g
 
     phi_logs = []
     step_logs = []
@@ -72,21 +72,22 @@ def deodesic_active_contours_segment(
     iterator = trange(it)
 
     for _ in iterator:
-        grad_y, grad_x = np.gradient(phi, axis=(-2, -1), edge_order=2)
+        grad_y, grad_x = sp.ndimage.gaussian_filter(phi, sigma=3, order=(1, 0)), sp.ndimage.gaussian_filter(phi, sigma=3, order=(0, 1))
         grad_magnitude = np.sqrt(grad_x**2 + grad_y**2)
 
         f_x = E * grad_x / (grad_magnitude + 1e-10)
         f_y = E * grad_y / (grad_magnitude + 1e-10)
         div_f = (
-            np.gradient(f_x, axis=(-2, -1), edge_order=2)[1]
-            + np.gradient(f_y, axis=(-2, -1), edge_order=2)[0]
+            sp.ndimage.gaussian_filter(f_x, sigma=3, order=(0, 1))
+            + sp.ndimage.gaussian_filter(f_y, sigma=3, order=(1, 0))
         )
-        dUdt = grad_magnitude * div_f
+        dUdt = div_f * grad_magnitude
         dUdt += c * E * grad_magnitude
 
-        iterator.set_description(f"{np.abs(dUdt).max():.4f}; {grad_magnitude.max():.4f}")
+        # iterator.set_description(f"{np.abs(dUdt).max():.4f}; {grad_magnitude.max():.4f}")
 
         phi += eta * dUdt
+        # phi = sp.ndimage.gaussian_filter(phi, sigma=1)
 
         step_logs.append(dUdt)
         phi_logs.append(phi.copy())
@@ -103,7 +104,7 @@ def deodesic_active_contours_segment(
 
     return {
         "phi": phi,
-        "E": E,
+        "edges": E,
         "phi_logs": phi_logs,
         "step_logs": step_logs,
         "fx_logs": fx_logs,
@@ -157,17 +158,18 @@ def vector_chan_vase(
 
         dphidt = eta * (mu * f_div + (1 - mu) * error_term)
         if combined_mathod:
-            dphidt += approximate_delta_function(dphidt, eps=3) * dphidt
+            dphidt += approximate_delta_function(dphidt, eps=1) * dphidt
         phi += dphidt
     
     return {
         "phi": phi,
-        "h": h,
+        "edges": h,
     }
 
 
 class SEG_METHOD(enum.Enum):
     GEODESIC_SNAKES = enum.auto()
+    ACTIVE_CONTOURS = enum.auto()
 
 class FEATURE_TYPE(enum.Enum):
     GABOR = enum.auto()
@@ -192,8 +194,8 @@ def segment(
     gabor_features, hl_features, names = gabor.gabor_features(image, gabor_filters_params)
     hl_features -= hl_features.mean(axis=(-2, -1), keepdims=True)
     hl_features /= (hl_features.std(axis=(-2, -1), keepdims=True) + 1e-6)
-    gabor_features = gabor.features_post_process(gabor_features, sigma=2, diffusion_eta=0.1, diffusion_steps=20)
-    hl_features = gabor.features_post_process(hl_features, sigma=2, diffusion_eta=0.1, diffusion_steps=10)
+    gabor_features = gabor.features_post_process(gabor_features, sigma=5, diffusion_eta=0.1, diffusion_steps=20)
+    hl_features = gabor.features_post_process(hl_features, sigma=3, diffusion_eta=0.1, diffusion_steps=20)
 
     if feature_type == FEATURE_TYPE.GABOR:
         features = gabor_features
@@ -205,11 +207,11 @@ def segment(
     imsize = image.shape[-1]
     if isinstance(initial_function, str):
         if initial_function == "disk":
-            phi0 = 2 * ski.segmentation.disk_level_set(image_shape=(imsize, imsize)).astype(float) - 1
+            phi0 = 2 * ski.segmentation.disk_level_set(image_shape=(imsize, imsize), radius=imsize//4).astype(float) - 1
             phi0 = sp.ndimage.gaussian_filter(phi0, sigma=5)
         elif initial_function == "checkers":
             phi0 = 2 * ski.segmentation.checkerboard_level_set((imsize, imsize), 10).astype(float) - 1
-            phi0 = sp.ndimage.gaussian_filter(phi0, sigma=5)
+            phi0 = sp.ndimage.gaussian_filter(phi0, sigma=2)
         elif initial_function == "random":
             phi0 = np.random.randn(imsize, imsize) * 0.1
             phi0 = sp.ndimage.gaussian_filter(phi0, sigma=5)
@@ -220,6 +222,10 @@ def segment(
 
     if method == SEG_METHOD.GEODESIC_SNAKES:
         res = vector_chan_vase(
+            features, phi0, it=it, eta=eta, **kwargs
+        )
+    elif method == SEG_METHOD.ACTIVE_CONTOURS:
+        res = deodesic_active_contours_segment(
             features, phi0, it=it, eta=eta, **kwargs
         )
     else:
